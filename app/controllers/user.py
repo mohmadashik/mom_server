@@ -3,6 +3,8 @@ from datetime import datetime
 import time 
 from flask import Blueprint, jsonify,render_template,url_for,flash,redirect,request
 from flask_login import login_user,current_user,logout_user, login_required
+from .. import bcrypt
+
 
 from ..db_manager import DBManager
 from ..models.user import User
@@ -43,7 +45,6 @@ def register():
 
 @user_bp.route("/login", methods=['POST'])
 def login():
-    from .. import bcrypt
     if current_user.is_authenticated:
         return jsonify({'message':'Already logged in'}), 200
     else:
@@ -57,6 +58,33 @@ def login():
             return jsonify({'message':'Login successful'}),200
         else:
             return jsonify({'message':'Login unsuccessful. Check username and password'}), 401
+
+@user_bp.route("/update/<int:user_id>", methods=['PUT'])
+def update_user(user_id):
+    try:
+        from .. import bcrypt
+        if not current_user.is_authenticated:
+            return jsonify({'message': 'Please log in to update your profile'}), 401
+
+        user = User.query.get(user_id)
+        if user is None:
+            return jsonify({'message': 'User not found'}), 404
+
+        if request.method == 'PUT':
+            data = request.get_json()
+            new_username = data.get('new_username')
+            new_password = data.get('new_password')
+
+            # Update user information
+            user.username = new_username
+            user.password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            db.session.commit()
+
+            return jsonify({'message': 'User information updated successfully'}), 200
+
+    except Exception as err:
+        return jsonify({'message': f'Error while updating user profile: {err}'}), 500
+
 
 @user_bp.route("/logout")
 def logout():
